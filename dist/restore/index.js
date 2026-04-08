@@ -85278,6 +85278,7 @@ var ARCH;
 (function (ARCH) {
     ARCH["X86_64"] = "x86_64";
     ARCH["AARCH64"] = "aarch64";
+    ARCH["RISCV64"] = "riscv64";
 })(ARCH || (ARCH = {}));
 var PLATFORM;
 (function (PLATFORM) {
@@ -85457,6 +85458,8 @@ function detectArchKey() {
             return "x86_64";
         case "arm64":
             return "aarch64";
+        case "riscv64":
+            return "riscv64";
         default:
             throw new Error(`Unsupported architecture: ${external_process_namespaceObject.arch}`);
     }
@@ -85587,9 +85590,16 @@ async function runInner() {
     saveState("appendTimestamp", getBooleanInput("append-timestamp"));
     startGroup(`Install ${ccacheVariant}`);
     const variant = selectVariant(ccacheVariant);
-    const pkg = selectPackage(variant);
     const method = selectMethod(installMethod);
-    await pkg.install(method);
+    if (method === INSTALL_METHOD.DETECT && await which(variant)) {
+        // If the install method is "detect" and the package is already installed,
+        // don't try to install it. This is to bypass architectures that are not
+        // released in upstream projects (linux-riscv64 for ccache/ccache for example).
+    }
+    else {
+        const pkg = selectPackage(variant);
+        await pkg.install(method);
+    }
     let ccachePath = await which(ccacheVariant, true);
     info(`${ccacheVariant} installed at ${ccachePath}`);
     endGroup();

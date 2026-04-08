@@ -17,6 +17,7 @@ export enum VARIANT {
 export enum ARCH {
   X86_64 = "x86_64",
   AARCH64 = "aarch64",
+  RISCV64 = "riscv64",
 }
 
 export enum PLATFORM {
@@ -219,12 +220,14 @@ function detectPlatform(): PLATFORM {
   }
 }
 
-function detectArchKey(): "x86_64" | "aarch64" {
+function detectArchKey(): "x86_64" | "aarch64" | "riscv64" {
   switch (process.arch) {
     case "x64":
       return "x86_64";
     case "arm64":
       return "aarch64";
+    case "riscv64":
+      return "riscv64";
     default:
       throw new Error(`Unsupported architecture: ${process.arch}`);
   }
@@ -379,10 +382,15 @@ async function runInner(): Promise<void> {
   core.startGroup(`Install ${ccacheVariant}`);
 
   const variant = selectVariant(ccacheVariant)
-  const pkg = selectPackage(variant)
   const method = selectMethod(installMethod);
-
-  await pkg.install(method);
+  if (method === INSTALL_METHOD.DETECT && await io.which(variant)) {
+    // If the install method is "detect" and the package is already installed,
+    // don't try to install it. This is to bypass architectures that are not
+    // released in upstream projects (linux-riscv64 for ccache/ccache for example).
+  } else {
+    const pkg = selectPackage(variant)
+    await pkg.install(method);
+  }
 
   let ccachePath = await io.which(ccacheVariant, true);
   core.info(`${ccacheVariant} installed at ${ccachePath}`)
